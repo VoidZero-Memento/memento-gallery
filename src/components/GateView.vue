@@ -11,11 +11,18 @@ import GateStage from "./gate/GateStage.vue";
 import type { GatePayload } from "../types/gallery.types";
 import type { GateFieldError, GateFormModel } from "../types/gate.types";
 
+const props = defineProps<{
+  /** 从画廊离开后重挂载：先关门再完整 intro */
+  reenter?: boolean;
+}>();
+
 const emit = defineEmits<{
   success: [payload: GatePayload];
 }>();
 
-const { phase, bannerReady, skipIntro, beginUnlock } = useGateStage();
+const { phase, bannerReady, skipIntro, beginUnlock } = useGateStage({
+  reenter: props.reenter,
+});
 
 const auroraRef = ref<{ burst: (x: number, y: number) => void } | null>(null);
 const submitting = ref(false);
@@ -30,7 +37,10 @@ const showForm = computed(
   () => phase.value === "form" || phase.value === "unlocking",
 );
 const locked = computed(
-  () => phase.value === "unlocking" || phase.value === "done",
+  () =>
+    phase.value === "closing" ||
+    phase.value === "unlocking" ||
+    phase.value === "done",
 );
 const panelOut = computed(() => locked.value);
 

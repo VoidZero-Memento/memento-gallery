@@ -1,5 +1,11 @@
-/** 验证页阶段机：booting 等 banner 解码，unlocking 播放解锁过场后才 emit */
-export type GatePhase = "booting" | "intro" | "form" | "unlocking" | "done";
+/** 验证页阶段机：booting 等 banner；closing 为离开画廊后的关门；unlocking 解锁过场后才 emit */
+export type GatePhase =
+  | "booting"
+  | "intro"
+  | "form"
+  | "closing"
+  | "unlocking"
+  | "done";
 
 export type GateFormModel = {
   secret: string;

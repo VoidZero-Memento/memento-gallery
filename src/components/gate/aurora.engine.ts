@@ -75,6 +75,7 @@ export const PHASE_TUNING: Record<
   booting: { intensity: 0.25, bloom: 0 },
   intro: { intensity: 1, bloom: 0.34 },
   form: { intensity: 0.75, bloom: 0.08 },
+  closing: { intensity: 1.15, bloom: 0.9 },
   unlocking: { intensity: 1.3, bloom: 1 },
   done: { intensity: 0, bloom: 0 },
 };

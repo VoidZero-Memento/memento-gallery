@@ -9,16 +9,25 @@ const BOOT_MAX_MS = 1700;
 const INTRO_MS = 2300;
 const UNLOCK_MS = 1500;
 const UNLOCK_MS_REDUCED = 160;
+const CLOSE_MS = 1500;
+const CLOSE_MS_REDUCED = 160;
 const REDUCED_QUERY = "(prefers-reduced-motion: reduce)";
 
-export const useGateStage = () => {
-  const phase = ref<GatePhase>("booting");
-  const bannerReady = ref(false);
+export type UseGateStageOptions = {
+  /** 从画廊返回：先播关门，再走完整 intro */
+  reenter?: boolean;
+};
+
+export const useGateStage = (options: UseGateStageOptions = {}) => {
+  const reenter = Boolean(options.reenter);
+  const phase = ref<GatePhase>(reenter ? "closing" : "booting");
+  const bannerReady = ref(reenter);
   const reduceMotion = ref(false);
 
   let bootTimer = 0;
   let introTimer = 0;
   let unlockTimer = 0;
+  let closeTimer = 0;
   let media: MediaQueryList | null = null;
   let disposed = false;
 
@@ -32,15 +41,20 @@ export const useGateStage = () => {
     phase.value = "form";
   };
 
-  const enterIntro = () => {
-    window.clearTimeout(bootTimer);
-    if (disposed || phase.value !== "booting") return;
+  const startIntro = () => {
+    if (disposed) return;
     if (reduceMotion.value) {
       phase.value = "form";
       return;
     }
     phase.value = "intro";
     introTimer = window.setTimeout(enterForm, INTRO_MS);
+  };
+
+  const enterIntro = () => {
+    window.clearTimeout(bootTimer);
+    if (disposed || phase.value !== "booting") return;
+    startIntro();
   };
 
   const preloadBanner = async () => {
@@ -70,6 +84,7 @@ export const useGateStage = () => {
   const beginUnlock = (onDone: () => void) => {
     if (phase.value === "unlocking" || phase.value === "done") return;
     window.clearTimeout(introTimer);
+    window.clearTimeout(closeTimer);
     phase.value = "unlocking";
     unlockTimer = window.setTimeout(
       () => {
@@ -81,10 +96,28 @@ export const useGateStage = () => {
     );
   };
 
+  const beginClose = () => {
+    phase.value = "closing";
+    closeTimer = window.setTimeout(
+      () => {
+        if (disposed) return;
+        startIntro();
+      },
+      reduceMotion.value ? CLOSE_MS_REDUCED : CLOSE_MS,
+    );
+  };
+
   onMounted(() => {
     media = window.matchMedia(REDUCED_QUERY);
     reduceMotion.value = media.matches;
     media.addEventListener("change", onMediaChange);
+
+    if (reenter) {
+      bannerReady.value = true;
+      void preloadBanner();
+      beginClose();
+      return;
+    }
 
     bootTimer = window.setTimeout(enterIntro, BOOT_MAX_MS);
     void preloadBanner().then(enterIntro);
@@ -95,6 +128,7 @@ export const useGateStage = () => {
     window.clearTimeout(bootTimer);
     window.clearTimeout(introTimer);
     window.clearTimeout(unlockTimer);
+    window.clearTimeout(closeTimer);
     media?.removeEventListener("change", onMediaChange);
   });
 

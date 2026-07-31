@@ -103,6 +103,7 @@ watch(
     state.targetIntensity = tuning.intensity
     state.targetBloom = tuning.bloom
     if (phase === 'intro' && state.width > 0) spawnRipple(state, state.width / 2, state.height / 2, 0.55)
+    if (phase === 'closing' && state.width > 0) spawnRipple(state, state.width / 2, state.height / 2, 0.85)
     if (phase === 'unlocking') startUnlock(state)
     if (phase !== 'done') start()
   },

@@ -213,6 +213,23 @@ defineProps<{
   opacity: 1;
 }
 
+/* 关门：从「已打开」的白光态反向收回，再交给 intro */
+.stage--closing .stage__rays {
+  opacity: 1;
+}
+
+.stage--closing .stage__drift {
+  animation: stage-settle 1.5s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+.stage--closing .stage__seam {
+  animation: seam-close 1.5s cubic-bezier(0.7, 0, 0.3, 1) forwards;
+}
+
+.stage--closing .stage__flash {
+  animation: flash-recede 1.5s cubic-bezier(0.7, 0, 0.35, 1) forwards;
+}
+
 @keyframes stage-drift {
   from {
     transform: scale(1) translate3d(0, 0, 0);
@@ -267,6 +284,51 @@ defineProps<{
   }
 }
 
+@keyframes stage-settle {
+  from {
+    transform: scale(1.22);
+    filter: blur(14px) brightness(1.45);
+  }
+  to {
+    transform: scale(1);
+    filter: blur(0) brightness(1);
+  }
+}
+
+@keyframes seam-close {
+  0% {
+    opacity: 0;
+    width: 130vw;
+  }
+  35% {
+    opacity: 1;
+    width: 12vw;
+  }
+  75% {
+    opacity: 1;
+    width: 3px;
+  }
+  100% {
+    opacity: 0;
+    width: 2px;
+  }
+}
+
+@keyframes flash-recede {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  55% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.35);
+  }
+}
+
 @keyframes rays-turn {
   to {
     rotate: 360deg;
@@ -277,7 +339,9 @@ defineProps<{
   .stage__drift,
   .stage__rays,
   .stage--unlocking .stage__drift,
-  .stage--unlocking .stage__seam {
+  .stage--unlocking .stage__seam,
+  .stage--closing .stage__drift,
+  .stage--closing .stage__seam {
     animation: none;
   }
 
@@ -290,6 +354,12 @@ defineProps<{
   .stage--unlocking .stage__flash {
     animation: none;
     opacity: 1;
+    transition: opacity 0.3s linear;
+  }
+
+  .stage--closing .stage__flash {
+    animation: none;
+    opacity: 0;
     transition: opacity 0.3s linear;
   }
 }
