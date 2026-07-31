@@ -13,10 +13,12 @@ export const loadGateSession = (): GatePayload | null => {
     const parsed = JSON.parse(raw) as GatePayload
     if (
       typeof parsed.spaceName === 'string' &&
-      typeof parsed.count === 'number' &&
-      Array.isArray(parsed.excludes)
+      typeof parsed.count === 'number'
     ) {
-      return parsed
+      return {
+        spaceName: parsed.spaceName,
+        count: parsed.count,
+      }
     }
   } catch {
     /* ignore */

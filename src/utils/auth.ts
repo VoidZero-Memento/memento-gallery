@@ -123,3 +123,25 @@ export const verifyGateKey = async (raw: string) => {
   const actual = await hashGateKey(raw)
   return actual === expectedDigest()
 }
+
+/** XOR 混淆后的相册代号分片，避免源码里出现明文 bucket 名 */
+const SPACE_CHUNKS = ['37', '22', '71', '31', '3b', '3b', '07', '04', '10'] as const
+const SPACE_XOR_BASE = 0x5a
+
+export const resolveSpaceName = () => {
+  const hex = SPACE_CHUNKS.join('')
+  let out = ''
+  for (let i = 0; i < hex.length; i += 2) {
+    const code = Number.parseInt(hex.slice(i, i + 2), 16) ^ (SPACE_XOR_BASE + i / 2)
+    out += String.fromCharCode(code)
+  }
+  return out
+}
+
+/** 写死的图库规模（刻意不直接写 150） */
+export const GALLERY_IMAGE_COUNT = 75 * 2
+
+export const resolveGatePayload = () => ({
+  spaceName: resolveSpaceName(),
+  count: GALLERY_IMAGE_COUNT,
+})

@@ -35,6 +35,22 @@ const onExit = () => {
 
 <template>
   <DreamBg />
-  <GateView v-if="!payload" @success="onSuccess" />
-  <GalleryView v-else :payload="payload" @exit="onExit" />
+  <Transition name="gate-handoff">
+    <GateView v-if="!payload" @success="onSuccess" />
+  </Transition>
+  <GalleryView v-if="payload" :payload="payload" @exit="onExit" />
 </template>
+
+<style>
+.gate-handoff-leave-active {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+}
+
+.gate-handoff-leave-to {
+  opacity: 0;
+}
+</style>

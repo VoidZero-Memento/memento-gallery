@@ -270,11 +270,11 @@ onUnmounted(() => {
             <p id="exit-confirm-title" class="exit-confirm__title">确定离开吗？</p>
             <p class="exit-confirm__desc">离开后需重新进入记忆之门</p>
             <div class="exit-confirm__actions">
-              <button class="exit-confirm__btn exit-confirm__btn--ghost" type="button" @click="cancelExit">
+              <button class="exit-confirm__btn exit-confirm__btn--stay" type="button" @click="cancelExit">
                 再看看
               </button>
-              <button class="exit-confirm__btn exit-confirm__btn--danger" type="button" @click="confirmExit">
-                离开
+              <button class="exit-confirm__btn exit-confirm__btn--leave" type="button" @click="confirmExit">
+                轻轻离开
               </button>
             </div>
           </div>
@@ -440,36 +440,60 @@ onUnmounted(() => {
 .exit-confirm__actions {
   display: flex;
   gap: 10px;
-  margin-top: 18px;
+  margin-top: 20px;
 }
 
 .exit-confirm__btn {
   flex: 1;
   appearance: none;
   -webkit-appearance: none;
-  border-radius: 999px;
-  padding: 10px 12px;
+  border-radius: 14px;
+  padding: 11px 12px;
   font: inherit;
   font-size: 0.86rem;
+  letter-spacing: 0.08em;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: opacity 0.2s, transform 0.2s;
+  transition:
+    transform 0.2s,
+    background-color 0.2s,
+    border-color 0.2s,
+    color 0.2s;
 }
 
 .exit-confirm__btn:hover {
   transform: translateY(-1px);
 }
 
-.exit-confirm__btn--ghost {
-  border: 1px solid rgba(160, 150, 160, 0.28);
-  background: rgba(255, 255, 255, 0.7);
+.exit-confirm__btn--stay {
+  border: 1px solid rgba(255, 140, 160, 0.42);
+  background: linear-gradient(
+    145deg,
+    rgba(255, 200, 180, 0.55),
+    rgba(255, 143, 168, 0.42)
+  );
+  color: var(--ink);
+}
+
+.exit-confirm__btn--stay:hover {
+  border-color: rgba(255, 126, 157, 0.55);
+  background: linear-gradient(
+    145deg,
+    rgba(255, 200, 180, 0.72),
+    rgba(255, 143, 168, 0.55)
+  );
+}
+
+.exit-confirm__btn--leave {
+  border: 1px solid rgba(255, 160, 180, 0.22);
+  background: rgba(255, 248, 250, 0.72);
   color: var(--ink-soft);
 }
 
-.exit-confirm__btn--danger {
-  border: 1px solid rgba(255, 140, 160, 0.35);
-  background: linear-gradient(120deg, rgba(255, 126, 157, 0.18), rgba(255, 176, 122, 0.16));
+.exit-confirm__btn--leave:hover {
+  border-color: rgba(255, 140, 160, 0.36);
   color: var(--ink);
+  background: rgba(255, 255, 255, 0.92);
 }
 
 .confirm-enter-active,

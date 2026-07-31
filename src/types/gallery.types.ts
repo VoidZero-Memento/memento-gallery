@@ -1,7 +1,6 @@
 export type GatePayload = {
   spaceName: string
   count: number
-  excludes: number[]
 }
 
 export type GalleryImage = {
