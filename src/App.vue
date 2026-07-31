@@ -1,48 +1,46 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch } from "vue";
 
-import DreamBg from './components/DreamBg.vue'
-import GalleryView from './components/GalleryView.vue'
-import GateView from './components/GateView.vue'
-import { clearGateSession, loadGateSession } from './utils/session'
-import { CHROME_THEME, setChromeTheme } from './utils/theme'
+import DreamBg from "./components/DreamBg.vue";
+import GalleryView from "./components/GalleryView.vue";
+import GateView from "./components/GateView.vue";
+import { clearGateSession, loadGateSession } from "./utils/session";
+import { CHROME_THEME, setChromeTheme } from "./utils/theme";
 
-import type { GatePayload } from './types/gallery.types'
-
-const payload = ref<GatePayload | null>(null)
-const reenter = ref(false)
+const unlocked = ref(false);
+const reenter = ref(false);
 
 onMounted(() => {
-  payload.value = loadGateSession()
-})
+  unlocked.value = loadGateSession();
+});
 
 watch(
-  payload,
+  unlocked,
   (v) => {
-    if (!v) setChromeTheme(CHROME_THEME.soft)
+    if (!v) setChromeTheme(CHROME_THEME.soft);
   },
   { immediate: true },
-)
+);
 
-const onSuccess = (next: GatePayload) => {
-  reenter.value = false
-  payload.value = next
-}
+const onSuccess = () => {
+  reenter.value = false;
+  unlocked.value = true;
+};
 
 const onExit = () => {
-  clearGateSession()
-  reenter.value = true
-  payload.value = null
-}
+  clearGateSession();
+  reenter.value = true;
+  unlocked.value = false;
+};
 </script>
 
 <template>
   <DreamBg />
   <Transition name="gate-handoff">
-    <GateView v-if="!payload" :reenter="reenter" @success="onSuccess" />
+    <GateView v-if="!unlocked" :reenter="reenter" @success="onSuccess" />
   </Transition>
   <Transition name="gallery-handoff">
-    <GalleryView v-if="payload" :payload="payload" @exit="onExit" />
+    <GalleryView v-if="unlocked" @exit="onExit" />
   </Transition>
 </template>
 

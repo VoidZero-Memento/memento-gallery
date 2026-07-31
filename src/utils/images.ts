@@ -1,15 +1,12 @@
-import type { GalleryImage, GatePayload } from "../types/gallery.types";
+import type { GalleryImage, OssImageMeta } from "../types/gallery.types";
 
-const OSS_REGION = "oss-cn-shenzhen";
-const FILE_PREFIX = "banner";
-const FILE_EXTS = ["png", "jpg"] as const;
+const IMAGES_JSON_URL =
+  "https://voidzero-memento.github.io/memento-oss/images.json";
+const GALLERY_NAME_RE = /^banner(\d+)\.(png|jpe?g|webp)$/i;
 const RESOLVE_CONCURRENCY = 8;
 
 export const LOADING_BANNER_URL =
   "https://my-ledger.oss-cn-shenzhen.aliyuncs.com/loading-banner.png";
-
-export const buildOssBase = (spaceName: string): string =>
-  `https://${spaceName.trim()}.${OSS_REGION}.aliyuncs.com`;
 
 type ProbeOk = { ok: true; width: number; height: number };
 type ProbeFail = { ok: false };
@@ -40,26 +37,10 @@ const probeImage = (url: string, signal?: AbortSignal): Promise<ProbeResult> =>
     img.src = url;
   });
 
-export const resolveImageUrl = async (
-  base: string,
-  id: number,
-  signal?: AbortSignal,
-): Promise<GalleryImage | null> => {
-  for (const ext of FILE_EXTS) {
-    if (signal?.aborted) return null;
-    const name = `${FILE_PREFIX}${id}.${ext}`;
-    const url = `${base}/${name}`;
-    const probed = await probeImage(url, signal);
-    if (probed.ok) {
-      return {
-        id,
-        name,
-        url,
-        ratio: probed.height / probed.width,
-      };
-    }
-  }
-  return null;
+const parseGalleryMeta = (item: OssImageMeta): { id: number; meta: OssImageMeta } | null => {
+  const matched = item.name.match(GALLERY_NAME_RE);
+  if (!matched) return null;
+  return { id: Number(matched[1]), meta: item };
 };
 
 const runPool = async <T, R>(
@@ -90,27 +71,55 @@ export type ResolveProgress = {
   total: number;
 };
 
-/** 解析扩展名、预加载，并记录宽高比供瀑布流占位 */
+const fetchImageList = async (signal?: AbortSignal): Promise<OssImageMeta[]> => {
+  const response = await fetch(IMAGES_JSON_URL, { signal });
+  if (!response.ok) {
+    throw new Error(`images.json fetch failed: ${response.status}`);
+  }
+  const data: unknown = await response.json();
+  if (!Array.isArray(data)) {
+    throw new Error("images.json format invalid");
+  }
+  return data.filter(
+    (item): item is OssImageMeta =>
+      !!item &&
+      typeof item === "object" &&
+      typeof (item as OssImageMeta).name === "string" &&
+      typeof (item as OssImageMeta).url === "string",
+  );
+};
+
+/** 拉取清单、过滤画廊图、预加载并记录宽高比供瀑布流占位 */
 export const resolveGalleryImages = async (
-  payload: GatePayload,
   onProgress?: (progress: ResolveProgress) => void,
   signal?: AbortSignal,
 ): Promise<GalleryImage[]> => {
-  const base = buildOssBase(payload.spaceName);
-  const ids = Array.from({ length: payload.count }, (_, i) => i + 1);
+  const raw = await fetchImageList(signal);
+  if (signal?.aborted) return [];
 
-  onProgress?.({ done: 0, total: ids.length });
-  if (ids.length === 0) return [];
+  const entries = raw
+    .map(parseGalleryMeta)
+    .filter((item): item is { id: number; meta: OssImageMeta } => item !== null)
+    .sort((a, b) => a.id - b.id);
+
+  onProgress?.({ done: 0, total: entries.length });
+  if (entries.length === 0) return [];
 
   let done = 0;
   const resolved = await runPool(
-    ids,
+    entries,
     RESOLVE_CONCURRENCY,
-    async (id) => {
-      const image = await resolveImageUrl(base, id, signal);
+    async ({ id, meta }) => {
+      const probed = await probeImage(meta.url, signal);
       done += 1;
-      onProgress?.({ done, total: ids.length });
-      return image;
+      onProgress?.({ done, total: entries.length });
+      if (!probed.ok) return null;
+      return {
+        id,
+        name: meta.name,
+        url: meta.url,
+        ratio: probed.height / probed.width,
+      } satisfies GalleryImage;
     },
     signal,
   );

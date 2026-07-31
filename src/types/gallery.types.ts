@@ -1,6 +1,7 @@
-export type GatePayload = {
-  spaceName: string
-  count: number
+export type OssImageMeta = {
+  name: string
+  url: string
+  size: number
 }
 
 export type GalleryImage = {

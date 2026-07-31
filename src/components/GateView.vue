@@ -2,13 +2,12 @@
 import { computed, ref } from "vue";
 
 import { useGateStage } from "../composables/useGateStage";
-import { resolveGatePayload, verifyGateKey } from "../utils/auth";
+import { verifyGateKey } from "../utils/auth";
 import { saveGateSession } from "../utils/session";
 import GateAurora from "./gate/GateAurora.vue";
 import GateForm from "./gate/GateForm.vue";
 import GateStage from "./gate/GateStage.vue";
 
-import type { GatePayload } from "../types/gallery.types";
 import type { GateFieldError, GateFormModel } from "../types/gate.types";
 
 const props = defineProps<{
@@ -17,7 +16,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  success: [payload: GatePayload];
+  success: [];
 }>();
 
 const { phase, bannerReady, skipIntro, beginUnlock } = useGateStage({
@@ -28,7 +27,6 @@ const auroraRef = ref<{ burst: (x: number, y: number) => void } | null>(null);
 const submitting = ref(false);
 const shaking = ref(false);
 const error = ref<GateFieldError | null>(null);
-let pending: GatePayload | null = null;
 
 const showBrand = computed(
   () => phase.value === "intro" || phase.value === "form",
@@ -63,11 +61,10 @@ const onSubmit = async (model: GateFormModel) => {
       fail("密钥不对，请重新输入", "secret");
       return;
     }
-    pending = resolveGatePayload();
-    saveGateSession(pending);
+    saveGateSession();
     auroraRef.value?.burst(window.innerWidth / 2, window.innerHeight * 0.42);
     beginUnlock(() => {
-      if (pending) emit("success", pending);
+      emit("success");
     });
   } catch {
     fail("密钥校验失败，请刷新后重试", "secret");

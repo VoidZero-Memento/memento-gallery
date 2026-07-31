@@ -1,31 +1,13 @@
-import type { GatePayload } from '../types/gallery.types'
+const SESSION_KEY = "memento.gate.v2";
 
-const SESSION_KEY = 'memento.gate.v1'
+export const saveGateSession = () => {
+  sessionStorage.setItem(SESSION_KEY, "1");
+};
 
-export const saveGateSession = (payload: GatePayload) => {
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload))
-}
-
-export const loadGateSession = (): GatePayload | null => {
-  const raw = sessionStorage.getItem(SESSION_KEY)
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(raw) as GatePayload
-    if (
-      typeof parsed.spaceName === 'string' &&
-      typeof parsed.count === 'number'
-    ) {
-      return {
-        spaceName: parsed.spaceName,
-        count: parsed.count,
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return null
-}
+export const loadGateSession = (): boolean => {
+  return sessionStorage.getItem(SESSION_KEY) === "1";
+};
 
 export const clearGateSession = () => {
-  sessionStorage.removeItem(SESSION_KEY)
-}
+  sessionStorage.removeItem(SESSION_KEY);
+};

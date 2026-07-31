@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 
 import { resolveGalleryImages } from "../utils/images";
 import { CHROME_THEME, setChromeTheme } from "../utils/theme";
@@ -9,7 +9,7 @@ import GalleryLoading from "./GalleryLoading.vue";
 import GalleryTile from "./GalleryTile.vue";
 import "vue-waterfall-plugin-next/dist/style.css";
 
-import type { GalleryImage, GatePayload } from "../types/gallery.types";
+import type { GalleryImage } from "../types/gallery.types";
 
 /** 进度补到 100% 的停留时间（与 fill 过渡对齐） */
 const FINISH_HOLD_MS = 1000;
@@ -17,10 +17,6 @@ const FINISH_HOLD_MS = 1000;
 const LEAVE_MS = 780;
 /** afterRender 未触发时的兜底 */
 const REVEAL_FALLBACK_MS = 3200;
-
-const props = defineProps<{
-  payload: GatePayload;
-}>();
 
 const emit = defineEmits<{
   exit: [];
@@ -160,7 +156,6 @@ const prepare = async () => {
   setChromeTheme(CHROME_THEME.soft);
 
   const list = await resolveGalleryImages(
-    props.payload,
     ({ done, total }) => {
       if (signal.aborted) return;
       progressDone.value = done;
@@ -179,13 +174,6 @@ const prepare = async () => {
     if (!signal.aborted) revealGallery();
   }, REVEAL_FALLBACK_MS);
 };
-
-watch(
-  () => props.payload,
-  () => {
-    void prepare();
-  },
-);
 
 onMounted(() => {
   syncCols();
