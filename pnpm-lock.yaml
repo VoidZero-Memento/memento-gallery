@@ -11,9 +11,6 @@ importers:
       vue:
         specifier: ^3.5.39
         version: 3.5.40(typescript@6.0.3)
-      vue-waterfall-plugin-next:
-        specifier: ^3.0.1
-        version: 3.0.1
     devDependencies:
       '@types/node':
         specifier: ^24.13.2
@@ -442,9 +439,6 @@ packages:
     peerDependencies:
       typescript: '>=5.0.0'
 
-  vue-waterfall-plugin-next@3.0.1:
-    resolution: {integrity: sha512-ggtP0LkDRKABsTflya9l0YE/D2S6MYG+VBgvkVmCwqLanJy6STYCPFumYCujV9/ansxd81GBgwPe6DUegRDT+w==}
-
   vue@3.5.40:
     resolution: {integrity: sha512-+8PJ4SJXdn/cHGImF4CKdxlWHIN5Dkt7DoufRREM6h6uVCx2m7QxgcEQmmzyOK8A9mcafg7sFbJFYsdFVubTig==}
     peerDependencies:
@@ -781,8 +775,6 @@ snapshots:
       '@volar/typescript': 2.4.28
       '@vue/language-core': 3.3.8
       typescript: 6.0.3
-
-  vue-waterfall-plugin-next@3.0.1: {}
 
   vue@3.5.40(typescript@6.0.3):
     dependencies:

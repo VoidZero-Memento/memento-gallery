@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 
 import { resolveGalleryImages } from "../utils/images";
 import { CHROME_THEME, setChromeTheme } from "../utils/theme";
 
-import { Waterfall } from "vue-waterfall-plugin-next";
+import GalleryLightbox from "./GalleryLightbox.vue";
 import GalleryLoading from "./GalleryLoading.vue";
 import GalleryTile from "./GalleryTile.vue";
-import "vue-waterfall-plugin-next/dist/style.css";
+import VirtualWaterfall from "./VirtualWaterfall.vue";
 
 import type { GalleryImage } from "../types/gallery.types";
+import type { LightboxOriginRect } from "../types/lightbox.types";
 
 /** 进度补到 100% 的停留时间（与 fill 过渡对齐） */
 const FINISH_HOLD_MS = 1000;
@@ -20,6 +21,7 @@ const REVEAL_FALLBACK_MS = 3200;
 
 const emit = defineEmits<{
   exit: [];
+  photosChange: [urls: string[]];
 }>();
 
 const images = ref<GalleryImage[]>([]);
@@ -28,19 +30,44 @@ const revealed = ref(false);
 const arranging = ref(false);
 const progressDone = ref(0);
 const progressTotal = ref(0);
-const visibleCount = ref(24);
 const lightbox = ref<GalleryImage | null>(null);
+const lightboxOrigin = ref<LightboxOriginRect | null>(null);
+const lightboxRef = ref<InstanceType<typeof GalleryLightbox> | null>(null);
 const entered = ref(false);
 const exitConfirm = ref(false);
+
+/** 与瀑布流列数对齐，供卡片倾角按「同列上下交错」计算 */
+const cols = ref(3);
 
 let abortCtrl: AbortController | null = null;
 let revealTimer = 0;
 let leaveTimer = 0;
-let appendLock = false;
 let revealStarted = false;
+let scrollLocked = false;
+let lockedScrollY = 0;
 
 const showLoading = computed(() => !revealed.value);
-const visibleImages = computed(() => images.value.slice(0, visibleCount.value));
+
+const setScrollLocked = (locked: boolean) => {
+  if (locked === scrollLocked) return;
+  const html = document.documentElement;
+  const { body } = document;
+  if (locked) {
+    lockedScrollY = window.scrollY;
+    // 不用 body position:fixed，避免打开瞬间重排整页瀑布流导致卡顿
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    body.style.touchAction = "none";
+    body.style.overscrollBehavior = "none";
+  } else {
+    html.style.overflow = "";
+    body.style.overflow = "";
+    body.style.touchAction = "";
+    body.style.overscrollBehavior = "";
+    window.scrollTo(0, lockedScrollY);
+  }
+  scrollLocked = locked;
+};
 
 const breakpoints = {
   1100: { rowPerView: 3 },
@@ -48,27 +75,25 @@ const breakpoints = {
   480: { rowPerView: 2 },
 };
 
-/** 与瀑布流列数对齐，供卡片倾角按「同列上下交错」计算 */
-const cols = ref(3);
-
-const syncCols = () => {
-  const w = window.innerWidth;
-  if (w <= 720) cols.value = 2;
-  else if (w <= 1100) cols.value = 3;
-  else cols.value = 4;
-};
-
 const clearRevealTimers = () => {
   window.clearTimeout(revealTimer);
   window.clearTimeout(leaveTimer);
 };
 
-const openLightbox = (img: GalleryImage) => {
+const openLightbox = (img: GalleryImage, origin: LightboxOriginRect) => {
+  // 先锁滚动再挂载灯箱，避免进场首帧和 body fixed 抢布局
+  setScrollLocked(true);
+  lightboxOrigin.value = origin;
   lightbox.value = img;
 };
 
 const closeLightbox = () => {
+  lightboxRef.value?.requestClose();
+};
+
+const onLightboxClose = () => {
   lightbox.value = null;
+  lightboxOrigin.value = null;
 };
 
 const askExit = () => {
@@ -93,6 +118,10 @@ const onKey = (e: KeyboardEvent) => {
   closeLightbox();
 };
 
+const onColsChange = (value: number) => {
+  cols.value = value;
+};
+
 /** 先补满进度并短暂停留，再淡出加载页，避免瞬间消失 */
 const revealGallery = () => {
   if (revealed.value || !prepared.value || revealStarted) return;
@@ -114,25 +143,11 @@ const revealGallery = () => {
 
 const onWallAfterRender = () => {
   if (!prepared.value || revealed.value || revealStarted) return;
-  window.requestAnimationFrame(() => {
-    revealGallery();
+  void nextTick(() => {
+    window.requestAnimationFrame(() => {
+      revealGallery();
+    });
   });
-};
-
-const appendMore = () => {
-  if (appendLock || !revealed.value) return;
-  if (visibleCount.value >= images.value.length) return;
-  appendLock = true;
-  visibleCount.value = Math.min(images.value.length, visibleCount.value + 18);
-  window.setTimeout(() => {
-    appendLock = false;
-  }, 220);
-};
-
-const onScroll = () => {
-  const remain =
-    document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
-  if (remain < 900) appendMore();
 };
 
 const prepare = async () => {
@@ -147,27 +162,27 @@ const prepare = async () => {
   entered.value = false;
   revealStarted = false;
   images.value = [];
-  visibleCount.value = 24;
   lightbox.value = null;
+  lightboxOrigin.value = null;
   exitConfirm.value = false;
   progressDone.value = 0;
   progressTotal.value = 0;
-  appendLock = false;
   setChromeTheme(CHROME_THEME.soft);
 
-  const list = await resolveGalleryImages(
-    ({ done, total }) => {
-      if (signal.aborted) return;
-      progressDone.value = done;
-      progressTotal.value = total;
-    },
-    signal,
-  );
+  const list = await resolveGalleryImages(({ done, total }) => {
+    if (signal.aborted) return;
+    progressDone.value = done;
+    progressTotal.value = total;
+  }, signal);
 
   if (signal.aborted) return;
 
   images.value = list;
   prepared.value = true;
+  emit(
+    "photosChange",
+    list.map((img) => img.url),
+  );
 
   clearRevealTimers();
   revealTimer = window.setTimeout(() => {
@@ -175,21 +190,35 @@ const prepare = async () => {
   }, REVEAL_FALLBACK_MS);
 };
 
+watch(
+  () => !!(showLoading.value || lightbox.value || exitConfirm.value),
+  (locked) => {
+    // 加载页 / lightbox / 退出确认期间锁滚动；lightbox 打开时已在 openLightbox 里提前锁定
+    setScrollLocked(locked);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => (prepared.value ? images.value.map((img) => img.url) : []),
+  (urls) => {
+    emit("photosChange", urls);
+  },
+  { immediate: true },
+);
+
 onMounted(() => {
-  syncCols();
   void prepare();
   window.addEventListener("keydown", onKey);
-  window.addEventListener("scroll", onScroll, { passive: true });
-  window.addEventListener("resize", syncCols, { passive: true });
 });
 
 onUnmounted(() => {
+  emit("photosChange", []);
   abortCtrl?.abort();
   clearRevealTimers();
+  setScrollLocked(false);
   setChromeTheme(CHROME_THEME.soft);
   window.removeEventListener("keydown", onKey);
-  window.removeEventListener("scroll", onScroll);
-  window.removeEventListener("resize", syncCols);
 });
 </script>
 
@@ -220,7 +249,7 @@ onUnmounted(() => {
         </h1>
         <p class="gallery__meta">
           <span class="gallery__dot" />
-          {{ visibleImages.length }} / {{ images.length }} 帧记忆漂浮中
+          {{ images.length }} 帧记忆漂浮中
         </p>
         <div class="gallery__ornament" aria-hidden="true">
           <span class="gallery__ornament-line" />
@@ -247,59 +276,34 @@ onUnmounted(() => {
         />
       </div>
 
-      <Waterfall
+      <VirtualWaterfall
         class="gallery__wall"
-        :list="visibleImages"
-        row-key="id"
-        img-selector="url"
+        :list="images"
         :width="248"
         :gutter="20"
-        :has-around-gutter="false"
         :breakpoints="breakpoints"
-        :row-per-view="cols"
-        background-color="transparent"
-        :horizontal-order="true"
-        :cross-origin="false"
-        :lazyload="false"
-        :animation-cancel="true"
-        :pos-duration="0"
-        :delay="80"
-        align="center"
         @after-render="onWallAfterRender"
+        @cols-change="onColsChange"
       >
-        <template #default="{ item, url, index }">
+        <template #default="{ item, url, index, cols: wallCols }">
           <GalleryTile
             :item="item"
             :url="url"
             :index="index"
-            :cols="cols"
+            :cols="wallCols || cols"
             @open="openLightbox"
           />
         </template>
-      </Waterfall>
+      </VirtualWaterfall>
     </div>
 
-    <Teleport to="body">
-      <Transition name="lb">
-        <div
-          v-if="lightbox"
-          class="lightbox"
-          role="dialog"
-          aria-modal="true"
-          @click.self="closeLightbox"
-        >
-          <div class="lightbox__aura" aria-hidden="true" />
-          <figure class="lightbox__figure">
-            <img
-              class="lightbox__img"
-              :src="lightbox.url"
-              :alt="lightbox.name"
-            />
-            <figcaption class="lightbox__cap">{{ lightbox.name }}</figcaption>
-          </figure>
-        </div>
-      </Transition>
-    </Teleport>
+    <GalleryLightbox
+      v-if="lightbox"
+      ref="lightboxRef"
+      :image="lightbox"
+      :origin="lightboxOrigin"
+      @close="onLightboxClose"
+    />
 
     <Teleport to="body">
       <Transition name="confirm">
@@ -345,7 +349,7 @@ onUnmounted(() => {
   z-index: 1;
   min-height: 100svh;
   padding: max(28px, env(safe-area-inset-top, 0px)) 28px
-    max(72px, calc(48px + env(safe-area-inset-bottom, 0px)));
+    max(36px, calc(20px + env(safe-area-inset-bottom, 0px)));
   max-width: 1280px;
   margin: 0 auto;
   opacity: 0;
@@ -710,103 +714,6 @@ onUnmounted(() => {
   overflow: visible;
 }
 
-.gallery__wall :deep(.waterfall-list) {
-  background: transparent !important;
-  /* 插件默认 overflow:hidden，会裁掉倾斜卡片的边角与光晕 */
-  overflow: visible !important;
-}
-
-.gallery__wall :deep(.waterfall-item) {
-  overflow: visible !important;
-  /* 给光晕留出绘制空间，避免真机被裁切 */
-  padding: 10px 6px 14px;
-  margin: -10px -6px -14px;
-}
-
-.lightbox {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background-color: #ffffff;
-  backdrop-filter: blur(16px);
-}
-
-.lightbox__aura {
-  position: absolute;
-  width: min(70vw, 520px);
-  height: min(70vw, 520px);
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    rgba(255, 150, 180, 0.35),
-    rgba(120, 200, 230, 0.18) 55%,
-    transparent 70%
-  );
-  filter: blur(20px);
-  pointer-events: none;
-  animation: aura-breathe 4s ease-in-out infinite;
-}
-
-.lightbox__figure {
-  position: relative;
-  z-index: 1;
-  margin: 0;
-  max-width: min(920px, 100%);
-  max-height: 90svh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-}
-
-.lightbox__img {
-  max-width: 100%;
-  max-height: 78svh;
-  border-radius: 24px;
-  box-shadow:
-    0 0 0 4px rgba(255, 255, 255, 0.9),
-    0 0 0 8px rgba(255, 160, 190, 0.35),
-    0 28px 70px rgba(255, 140, 160, 0.22);
-  object-fit: contain;
-}
-
-.lightbox__cap {
-  color: var(--ink);
-  font-size: 0.9rem;
-  letter-spacing: 0.08em;
-  padding: 6px 16px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(255, 160, 180, 0.28);
-  backdrop-filter: blur(8px);
-}
-
-.lb-enter-active,
-.lb-leave-active {
-  transition: opacity 0.32s ease;
-}
-
-.lb-enter-active .lightbox__figure,
-.lb-leave-active .lightbox__figure {
-  transition:
-    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.35s;
-}
-
-.lb-enter-from,
-.lb-leave-to {
-  opacity: 0;
-}
-
-.lb-enter-from .lightbox__figure,
-.lb-leave-to .lightbox__figure {
-  opacity: 0;
-  transform: scale(0.9) translateY(16px);
-}
-
 @keyframes pulse-dot {
   0%,
   100% {
@@ -853,18 +760,6 @@ onUnmounted(() => {
   }
 }
 
-@keyframes aura-breathe {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.85;
-  }
-  50% {
-    transform: scale(1.08);
-    opacity: 1;
-  }
-}
-
 @keyframes dust-drift {
   0%,
   100% {
@@ -887,8 +782,7 @@ onUnmounted(() => {
   .gallery__ornament-gem,
   .gallery__title-glow,
   .gallery__header::before,
-  .gallery__dust,
-  .lightbox__aura {
+  .gallery__dust {
     animation: none;
     transition: none;
   }

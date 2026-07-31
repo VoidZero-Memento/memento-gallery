@@ -9,8 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.5.39",
-    "vue-waterfall-plugin-next": "^3.0.1"
+    "vue": "^3.5.39"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",

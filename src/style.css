@@ -53,6 +53,7 @@ body {
 button,
 input {
   font: inherit;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button {
@@ -60,7 +61,6 @@ button {
   -webkit-appearance: none;
   background: transparent;
   border: none;
-  -webkit-tap-highlight-color: transparent;
 }
 
 ::selection {

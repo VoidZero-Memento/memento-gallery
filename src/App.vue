@@ -9,6 +9,7 @@ import { CHROME_THEME, setChromeTheme } from "./utils/theme";
 
 const unlocked = ref(false);
 const reenter = ref(false);
+const galleryPhotos = ref<string[]>([]);
 
 onMounted(() => {
   unlocked.value = loadGateSession();
@@ -28,19 +29,24 @@ const onSuccess = () => {
 };
 
 const onExit = () => {
+  galleryPhotos.value = [];
   clearGateSession();
   reenter.value = true;
   unlocked.value = false;
 };
+
+const onPhotosChange = (urls: string[]) => {
+  galleryPhotos.value = urls;
+};
 </script>
 
 <template>
-  <DreamBg />
+  <DreamBg :photo-urls="galleryPhotos" />
   <Transition name="gate-handoff">
     <GateView v-if="!unlocked" :reenter="reenter" @success="onSuccess" />
   </Transition>
   <Transition name="gallery-handoff">
-    <GalleryView v-if="unlocked" @exit="onExit" />
+    <GalleryView v-if="unlocked" @exit="onExit" @photos-change="onPhotosChange" />
   </Transition>
 </template>
 
